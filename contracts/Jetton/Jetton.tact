@@ -7,8 +7,11 @@ contract Jetton with JettonMaster, Deployable {
     owner: Address;
     jetton_content: Cell;
     mintable: Bool;
-    init(owner: Address, content: Cell){
-        self.total_supply = 0;
+
+
+    init(owner: Address, content: Cell, initial_supply: Int){
+        require(initial_supply > 0, "Initial supply must be greater than 0");
+        self.total_supply = initial_supply;
         self.owner = owner;
         self.mintable = true;
         self.jetton_content = content;
@@ -23,6 +26,9 @@ contract Jetton with JettonMaster, Deployable {
         require(ctx.sender == self.owner, "JettonMaster: Sender is not a Jetton owner");
         self.mintable = false;
     }
+
+
+
 }
 
 contract JettonWalletImp with JettonWallet, Deployable {

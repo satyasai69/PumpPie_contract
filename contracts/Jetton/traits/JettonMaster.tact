@@ -97,4 +97,8 @@ trait JettonMaster {
         let initCode: StateInit = self.calculate_jetton_wallet_init(owner_address);
         return contractAddress(initCode);
     }
+
+
 }
+
+
