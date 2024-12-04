@@ -1,0 +1,1 @@
+export * from '../build/jetton/tact_Jetton';

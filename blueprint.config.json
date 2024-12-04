@@ -1,0 +1,13 @@
+{
+    "compiler": {
+        "path": "@ton/blueprint/dist/cli.js"
+    },
+    "linker": {
+        "path": "@ton/blueprint/dist/cli.js"
+    },
+    "contracts": {
+        "jetton": {
+            "path": "contracts/jetton.tact"
+        }
+    }
+}

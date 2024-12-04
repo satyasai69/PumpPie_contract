@@ -1,0 +1,10 @@
+{
+    "compiler": {
+        "version": "0.35.0"
+    },
+    "dependencies": {
+        "@stdlib/deploy": "^0.35.0",
+        "@stdlib/ownable": "^0.35.0",
+        "@stdlib/stoppable": "^0.35.0"
+    }
+}
