@@ -7,8 +7,8 @@ import { buildOnchainMetadata } from '../utils/jetton-helpers';
 export async function run(provider: NetworkProvider) {
     // Deploy Jetton first
     const jettonContent = {
-        name: "Test Token",
-        symbol: "TST",
+        name: "Test Token 3",
+        symbol: "TST3",
         description: "Test Token for Pool",
         image: "https://example.com/image.png"
     };
@@ -37,7 +37,7 @@ export async function run(provider: NetworkProvider) {
     console.log('Jetton deployed at:', jetton.address);
 
     // Get Factory contract instance
-    const factory = provider.open(Factory.fromAddress(Address.parse("EQBu1aYylFcWAeRnI2rVp7LU5wPBQ7QBvNOaDKtAIrjm1gHI")));
+    const factory = provider.open(Factory.fromAddress(Address.parse("EQB3GYfP2EBtEHWW_sLYsHSHaYUT7AsH8r_drETw0jyBZv1T")));
 
     // Deploy Pool for the Jetton
     await factory.send(

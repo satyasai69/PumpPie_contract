@@ -4,11 +4,11 @@ import "../Jetton/traits/JettonMaster";
 import "../Jetton/Jetton";
 
 message BuyTokens {
-    tokenAmount: Int;
+   // tokenAmount: Int;
 }
 
 message SellTokens {
-    amount: Int;  // Amount of tokens to sell
+    tokenAmount: Int;  // Amount of tokens to sell
     from: Address;  // Address of token holder
 }
 
@@ -36,19 +36,21 @@ message GetJettonDataResponse {
 
 contract Pool with Deployable, Ownable {
     const DECIMALS: Int = 1000000000; // 10^9 for TON
-    const K: Int = 8000000000000000;  // Growth rate
+    const K: Int = 100000; // Growth rate multiplier
     const INITIAL_PRICE: Int = 30000000000000;  // Initial price in nanoTON
 
     owner: Address;
     tokenAddress: Address;
     tokenData: JettonData;
+    lastPrice: Int;  // Track last price for verification
 
     init(token: Address) {
         self.owner = sender();
         self.tokenAddress = token;
+        self.lastPrice = self.INITIAL_PRICE;
         self.tokenData = JettonData{
-            total_supply: 0,
-            mintable: false,
+            total_supply: 1000000000000000000,
+            mintable: true,
             admin_address: self.owner,
             jetton_content: emptyCell(),
             jetton_wallet_code: emptyCell()
@@ -58,31 +60,46 @@ contract Pool with Deployable, Ownable {
     receive(msg: BuyTokens) {
         let amount: Int = context().value;
         require(amount > ton("0.2"), "Must send at least 0.2 TON for gas");
-        
-        // Get current supply and calculate cost
-        let currentSupply: Int = self.getTokenSupply();
+        require(self.tokenData.mintable, "Token not mintable");
+          
+        // Calculate available TON for token purchase
         let availableTon: Int = amount - ton("0.15"); // Reserve 0.15 TON for gas
-        let cost: Int = self.calculateCost(currentSupply, self.DECIMALS); // Cost for 1 token unit
         
-        // Calculate tokens to mint based on available TON
-        let tokensToMint: Int = (availableTon * self.DECIMALS) / cost;
+        // Get current price per token unit
+        let currentSupply: Int = self.tokenData.total_supply;
+        let pricePerToken: Int = self.calculateCost(currentSupply, 1000000000);
+        require(pricePerToken > 0, "Invalid token price");
+        
+        // Calculate tokens to mint with overflow protection
+        let tokensToMint: Int = (availableTon * 1000000000) / pricePerToken;
         require(tokensToMint > 0, "Amount too small to mint tokens");
+        require(tokensToMint <= 1000000000000, "Too many tokens per transaction");
         
-        // Get token data and verify mintable
-        let data: JettonData = self.getTokenData();
-        require(data.mintable, "Token is not mintable");
+        // Update total supply
+        self.tokenData.total_supply = self.tokenData.total_supply + tokensToMint;
+        
+        // Log values for debugging
+        dump("Buy Operation:");
+        dump("Current Supply: ");
+        dump(currentSupply);
+        dump("Price Per Token: ");
+        dump(pricePerToken);
+        dump("Tokens to Mint: ");
+        dump(tokensToMint);
+        dump("New Supply: ");
+        dump(self.tokenData.total_supply);
         
         // Mint tokens to sender
         send(SendParameters{
             to: self.tokenAddress,
-            value: ton("0.1"),  // Send 0.1 TON for minting operation
-            mode: 1,  // SendIgnoreErrors
+            value: ton("0.1"),
+            mode: 1,
             body: JettonMint{
-                origin: myAddress(),  // Pool contract is the origin
-                receiver: sender(),   // Token buyer is the receiver
+                origin: myAddress(),
+                receiver: sender(),
                 amount: tokensToMint,
                 custom_payload: null,
-                forward_ton_amount: ton("0.05"),  // Forward some TON for wallet init
+                forward_ton_amount: ton("0.05"),
                 forward_payload: emptySlice()
             }.toCell()
         });
@@ -90,24 +107,54 @@ contract Pool with Deployable, Ownable {
 
     receive(msg: SellTokens) {
         // Calculate TON to return based on current supply
-        let currentSupply: Int = self.getTokenSupply();
-        let newSupply: Int = currentSupply - msg.amount;
-        let returnAmount: Int = self.calculateCost(newSupply, msg.amount);
+        let currentSupply: Int = self.tokenData.total_supply;
+        let newSupply: Int = currentSupply - msg.tokenAmount;
+        require(newSupply >= 0, "Not enough tokens in supply");
+        
+        // Calculate sell price (slightly lower than buy price)
+        let currentPrice: Int = self.calculateCost(currentSupply, msg.tokenAmount);
+        let sellPrice: Int = (currentPrice * 95) / 100; // 5% lower than buy price
+        let returnAmount: Int = (msg.tokenAmount * sellPrice) / self.DECIMALS;
         
         // Reserve some TON for gas
         require(returnAmount > ton("0.1"), "Sell amount too small");
+        require(returnAmount < ton("100"), "Sell amount too large"); // Add upper limit
+        
+        // Update total supply
+        self.tokenData.total_supply = newSupply;
+        
+        // Log values for debugging
+        dump("Sell Operation:");
+        dump("Current Supply: ");
+        dump(currentSupply);
+        dump("Tokens to Burn: ");
+        dump(msg.tokenAmount);
+        dump("Sell Price: ");
+        dump(sellPrice);
+        dump("Return Amount: ");
+        dump(returnAmount);
+        dump("New Supply: ");
+        dump(newSupply);
         
         // Burn the tokens first
         send(SendParameters{
             to: self.tokenAddress,
-            value: ton("0.1"),  // Send 0.1 TON for burn operation
-            mode: 1,  // SendIgnoreErrors
+            value: ton("0.1"),
+            mode: 1,
             body: JettonBurn{
                 query_id: 0,
-                amount: msg.amount,
+                amount: msg.tokenAmount,
                 custom_payload: null,
-                response_destination: myAddress()  // Pool will receive burn notification
+                response_destination: myAddress()
             }.toCell()
+        });
+        
+        // Send TON back to user
+        send(SendParameters{
+            to: msg.from,
+            value: returnAmount - ton("0.1"),
+            mode: 1,
+            body: "Tokens sold successfully".asComment()
         });
     }
 
@@ -116,7 +163,7 @@ contract Pool with Deployable, Ownable {
         require(sender() == self.tokenAddress, "Invalid burn notification");
         
         // Calculate TON to return
-        let currentSupply: Int = self.getTokenSupply();
+        let currentSupply: Int = self.tokenData.total_supply;
         let returnAmount: Int = self.calculateCost(currentSupply, msg.amount);
         
         // Send TON back to user
@@ -153,14 +200,21 @@ contract Pool with Deployable, Ownable {
         return sum;
     }
 
-    fun calculateCost(currentSupply: Int, tokensToBuy: Int): Int {
-        let exponent1: Int = (self.K * (currentSupply + tokensToBuy)) / self.DECIMALS;
-        let exponent2: Int = (self.K * currentSupply) / self.DECIMALS;
+    fun calculateCost(currentSupply: Int, tokenAmount: Int): Int {
+        // Convert supply to whole tokens
+        let supplyInTokens: Int = currentSupply / self.DECIMALS;
         
-        let exp1: Int = self.exp(exponent1);
-        let exp2: Int = self.exp(exponent2);
+        // Normalize supply to prevent overflow
+        // Use smaller numbers for calculation
+        let basePrice: Int = self.INITIAL_PRICE / 1000000000; // Convert to TON units
+        let normalizedSupply: Int = supplyInTokens / 1000000; // Scale down supply
         
-        return (self.INITIAL_PRICE * self.DECIMALS * (exp1 - exp2)) / self.K;
+        // Calculate price with controlled growth
+        let priceIncrease: Int = (normalizedSupply * normalizedSupply) / 10000;
+        let finalPrice: Int = basePrice + (basePrice * priceIncrease) / 100;
+        
+        // Convert back to nanoTON
+        return finalPrice * 1000000000;
     }
 
     get fun getTokenData(): JettonData {    
@@ -178,14 +232,11 @@ contract Pool with Deployable, Ownable {
     }   
 
     get fun getCurrentPrice(): Int {
-        let currentSupply: Int = self.getTokenSupply();
-        // Calculate price for 1 token unit (DECIMALS)
+        let currentSupply: Int = self.tokenData.total_supply;
         return self.calculateCost(currentSupply, self.DECIMALS);
     }
 
     get fun getTokenSupply(): Int {
-        let data: JettonData = self.getTokenData();
-       //let data: JettonData = self.fetch_jetton_data();
-        return data.total_supply;
+        return self.tokenData.total_supply;
     }
 }

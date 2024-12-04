@@ -14,11 +14,11 @@ message JettonVerified {
 }
 
 message BuyTokens {
-    tokenAddress: Address;
+   // tokenAddress: Address;
     tokenAmount: Int;
 }
 
 message SellTokens {
-    tokenAddress: Address;
+   // tokenAddress: Address;
     tokenAmount: Int;
 }

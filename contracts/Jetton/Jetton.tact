@@ -2,6 +2,12 @@ import "@stdlib/deploy";
 import "./traits/JettonMaster.tact";
 import "./traits/JettonWallet.tact";
 
+
+message TransferOwnership {
+  //  queryId: Int as uint64;  // Added standard queryId
+    newOwner: Address;
+}
+
 contract Jetton with JettonMaster, Deployable {
     total_supply: Int as coins;
     owner: Address;
@@ -9,9 +15,10 @@ contract Jetton with JettonMaster, Deployable {
     mintable: Bool;
 
 
-    init(owner: Address, content: Cell, initial_supply: Int){
-        require(initial_supply > 0, "Initial supply must be greater than 0");
-        self.total_supply = initial_supply;
+
+    init(owner: Address, content: Cell){ // initial_supply: Int
+       // require(initial_supply > 0, "Initial supply must be greater than 0");
+        self.total_supply = 0;
         self.owner = owner;
         self.mintable = true;
         self.jetton_content = content;
@@ -27,8 +34,24 @@ contract Jetton with JettonMaster, Deployable {
         self.mintable = false;
     }
 
+   receive(msg: TransferOwnership) {
+    // Security check
+    require(sender() == self.owner, "Not authorized to transfer ownership");
+    
+    // Update owner
+    let oldOwner: Address = self.owner;
+    self.owner = msg.newOwner;
 
 
+
+    // Send acknowledgment
+    send(SendParameters{
+        to: msg.newOwner,
+        value: 0,
+        mode: SendRemainingValue,
+        body: "Ownership transferred successfully".asComment()
+    });
+}
 }
 
 contract JettonWalletImp with JettonWallet, Deployable {
