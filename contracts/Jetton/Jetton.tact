@@ -2,9 +2,8 @@ import "@stdlib/deploy";
 import "./traits/JettonMaster.tact";
 import "./traits/JettonWallet.tact";
 
-
 message TransferOwnership {
-  //  queryId: Int as uint64;  // Added standard queryId
+    //  queryId: Int as uint64;  // Added standard queryId
     newOwner: Address;
 }
 
@@ -14,10 +13,9 @@ contract Jetton with JettonMaster, Deployable {
     jetton_content: Cell;
     mintable: Bool;
 
-
-
-    init(owner: Address, content: Cell){ // initial_supply: Int
-       // require(initial_supply > 0, "Initial supply must be greater than 0");
+    init(owner: Address, content: Cell){
+        // initial_supply: Int
+        // require(initial_supply > 0, "Initial supply must be greater than 0");
         self.total_supply = 0;
         self.owner = owner;
         self.mintable = true;
@@ -34,24 +32,22 @@ contract Jetton with JettonMaster, Deployable {
         self.mintable = false;
     }
 
-   receive(msg: TransferOwnership) {
-    // Security check
-    require(sender() == self.owner, "Not authorized to transfer ownership");
-    
-    // Update owner
-    let oldOwner: Address = self.owner;
-    self.owner = msg.newOwner;
+    receive(msg: TransferOwnership){
+        // Security check
+        require(sender() == self.owner, "Not authorized to transfer ownership");
+        // Update owner
+        let oldOwner: Address = self.owner;
+        self.owner = msg.newOwner;
 
-
-
-    // Send acknowledgment
-    send(SendParameters{
-        to: msg.newOwner,
-        value: 0,
-        mode: SendRemainingValue,
-        body: "Ownership transferred successfully".asComment()
-    });
-}
+        // Send acknowledgment
+        send(SendParameters{
+                to: msg.newOwner,
+                value: 0,
+                mode: SendRemainingValue,
+                body: "Ownership transferred successfully".asComment()
+            }
+        );
+    }
 }
 
 contract JettonWalletImp with JettonWallet, Deployable {
@@ -66,4 +62,6 @@ contract JettonWalletImp with JettonWallet, Deployable {
     override inline fun calculate_jetton_wallet_init(owner_address: Address): StateInit {
         return initOf JettonWalletImp(owner_address, self.jetton_master);
     }
+
+    //Price = (Initial Price) * (1 + Purchase Amount / Liquidity Pool)^Curve Steepness
 }

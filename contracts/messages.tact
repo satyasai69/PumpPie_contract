@@ -22,3 +22,18 @@ message SellTokens {
    // tokenAddress: Address;
     tokenAmount: Int;
 }
+
+message PoolBuy {
+    jettonAddress: Address;
+    amount: Int as coins;
+}
+
+message PoolSell {
+    jettonAddress: Address;
+    to: Address;
+    amount: Int as coins;
+}
+
+message AddJetton {
+    jettonAddress: Address;
+}

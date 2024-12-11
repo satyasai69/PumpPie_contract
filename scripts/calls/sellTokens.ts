@@ -1,6 +1,6 @@
 import { toNano, Address } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
-import { Pool } from '../build/pool/tact_Pool';
+import { Pool } from '../../build/pool/tact_Pool';
 
 export async function run(provider: NetworkProvider) {
     const POOL_ADDRESS = "EQB9gTUw1HgU7Q31Dx_iSgcHkRtNFCpn-WlaiJkHuwbPdaOx";

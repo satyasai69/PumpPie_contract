@@ -14,7 +14,7 @@ export async function run(provider: NetworkProvider) {
     await router.send(
         provider.sender(),
         {
-            value: toNano('0.5'),
+            value: toNano('0.5)',
         },
         {
             $$type: 'Deploy',

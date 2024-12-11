@@ -21,22 +21,24 @@ trait JettonMaster {
     owner: Address;
     jetton_content: Cell;
 
+    // Mint funcrtion
     receive(msg: JettonMint){
         let ctx: Context = context();
         self._mint_validate(ctx, msg);
         self._mint(ctx, msg);
     }
 
+    // Burn function
     receive(msg: JettonBurnNotification){
         let ctx: Context = context();
         self._burn_notification_validate(ctx, msg);
-     //   self._burn_notification(ctx, msg);
+        self._burn_notification(ctx, msg);
     }
 
     abstract inline fun calculate_jetton_wallet_init(owner_address: Address): StateInit;
 
     virtual inline fun _mint_validate(ctx: Context, msg: JettonMint) {
-       // require(ctx.sender == self.owner, "JettonMaster: Sender is not a Jetton owner");
+        // require(ctx.sender == self.owner, "JettonMaster: Sender is not a Jetton owner");
         require(self.mintable, "JettonMaster: Jetton is not mintable");
     }
 
@@ -67,9 +69,9 @@ trait JettonMaster {
         );
     }
 
-  /*  inline fun _burn_notification(ctx: Context, msg: JettonBurnNotification) {
+    inline fun _burn_notification(ctx: Context, msg: JettonBurnNotification) {
         self.total_supply = self.total_supply - msg.amount;
-        if (msg.response_destination != null) {
+        if (msg.response_destination.toString() != "") {   //  if (msg.response_destination != null) {
             send(SendParameters{
                     to: msg.response_destination,
                     value: 0,
@@ -78,7 +80,7 @@ trait JettonMaster {
                 }
             );
         }
-    } */
+    }
 
     // ====== Get Methods ====== //
 
@@ -97,8 +99,4 @@ trait JettonMaster {
         let initCode: StateInit = self.calculate_jetton_wallet_init(owner_address);
         return contractAddress(initCode);
     }
-
-
 }
-
-

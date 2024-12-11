@@ -1,8 +1,8 @@
 
  import { Address, toNano, beginCell } from '@ton/core';
-import { Jetton } from '../wrappers/Jetton';
+import { Jetton } from '../../wrappers/Jetton';
 import { NetworkProvider } from '@ton/blueprint';
-import { buildOnchainMetadata } from '../utils/jetton-helpers';
+import { buildOnchainMetadata } from '../../utils/jetton-helpers';
 
 export async function run(provider: NetworkProvider) {
     const jettonParams = {

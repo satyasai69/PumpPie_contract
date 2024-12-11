@@ -1,8 +1,8 @@
 import { toNano, Address, beginCell } from '@ton/core';
-import { Jetton } from '../wrappers/Jetton';
-import { Factory } from '../wrappers/Factory';
+import { Jetton } from '../../wrappers/Jetton';
+import { Factory } from '../../wrappers/Factory';
 import { NetworkProvider } from '@ton/blueprint';
-import { buildOnchainMetadata } from '../utils/jetton-helpers';
+import { buildOnchainMetadata } from '../../utils/jetton-helpers';
 
 export async function run(provider: NetworkProvider) {
     // Deploy Jetton first
@@ -14,11 +14,20 @@ export async function run(provider: NetworkProvider) {
     };
 
     let content = buildOnchainMetadata(jettonContent);
+
+    let Max_Supply: bigint = 100000000000000000000n; 
+    let initial_Price: bigint = 10000n;
+    let iinitial_mint_Amount: bigint = 10000000000000n;
+
+    const PoolCore_ADDRESS = "EQCml35ZSm5pCSEFO3aWRlGi0NspQh2jbKed8_w0rbwD9R0O";
     
     const jetton = provider.open(await Jetton.fromInit(
         provider.sender().address!, // admin
         content,
-        toNano('1000000') // initial supply
+        Max_Supply,
+        initial_Price,
+        iinitial_mint_Amount,
+        PoolCore_ADDRESS
     ));
 
     // Deploy Jetton contract

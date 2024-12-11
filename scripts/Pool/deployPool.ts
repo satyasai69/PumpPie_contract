@@ -1,6 +1,6 @@
 import { toNano, Address } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
-import { Factory } from '../build/Factory/tact_Factory';
+import { Factory } from '../../build/Factory/tact_Factory';
 
 export async function run(provider: NetworkProvider) {
     // Configuration
