@@ -1,12 +1,11 @@
 import { toNano, Address } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
-import { Factory } from '../../build/Factory/tact_Factory';
 import { PoolCore } from '../../wrappers/PoolCore';
 
 export async function run(provider: NetworkProvider) {
     // Configuration
-    const PoolCore_ADDRESS = "EQCml35ZSm5pCSEFO3aWRlGi0NspQh2jbKed8_w0rbwD9R0O";
-    const JETTON_ADDRESS = "EQBGl7Y--f-gX4PH3p8Jb_w8jAcnd3DHtJ-pCgsWC0PNHClw"; // Replace with your Jetton address
+    const PoolCore_ADDRESS = "EQCoGWzQKWBQ3RTCvlybeH6TJfjkv03XLGBFVuRvGGGu0qYW";
+    const JETTON_ADDRESS = "EQBWNd8tsYQa4QgQM2qj2YRsdc-h-_jp9KBRW6KBnYLLHo9P"; // Replace with your Jetton address
 
     try {
         console.log('Starting pool deployment...');
@@ -18,7 +17,7 @@ export async function run(provider: NetworkProvider) {
 
         // Deploy Pool for the Jetton
         console.log('\nSending deployment transaction...');
-      /*  await PoolCoreAdd.send(
+      await PoolCoreAdd.send(
             provider.sender(),
             {
                 value: toNano('0.01'), // 1 TON for deployment + 0.1 TON for fees
@@ -30,12 +29,12 @@ export async function run(provider: NetworkProvider) {
         ); 
 
         console.log('Deployment transaction sent');
-        await provider.waitForDeploy(PoolCoreAdd.address); */
+        await provider.waitForDeploy(PoolCoreAdd.address); 
 
 
         
-       const liq = await PoolCoreAdd.getGetJettonLiquidity(PoolCoreAdd.address);
-       console.log('Jetton Liquidity:', liq.toString());
+      // const liq = await PoolCoreAdd.getGetJettonLiquidity(PoolCoreAdd.address);
+      // console.log('Jetton Liquidity:', liq.toString());
       
 
        

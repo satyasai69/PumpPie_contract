@@ -34,8 +34,13 @@ contract PoolCore with Deployable, Ownable {
     
     // Receive TON from buy operations
     receive(msg: PoolBuy) {
+
+
         let pool: JettonPool? = self.pools.get(msg.jettonAddress);
         require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
+
+     // Verify that received value is sufficient
+    require(context().value >= msg.amount, "Insufficient value sent");
         
         // Update pool balance
         self.pools.set(msg.jettonAddress, JettonPool{

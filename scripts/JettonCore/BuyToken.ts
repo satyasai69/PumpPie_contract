@@ -3,8 +3,8 @@ import { NetworkProvider } from '@ton/blueprint';
 import { JettonCore } from '../../wrappers/jettonCore';
 
 export async function run(provider: NetworkProvider) {
-    const TOKEN_ADDRESS = 'EQBGl7Y--f-gX4PH3p8Jb_w8jAcnd3DHtJ-pCgsWC0PNHClw';
-    const TON_AMOUNT = toNano(0.1); // Amount of TON to spend
+    const TOKEN_ADDRESS = 'EQBWNd8tsYQa4QgQM2qj2YRsdc-h-_jp9KBRW6KBnYLLHo9P';
+    const TON_AMOUNT = toNano(0.5); // Amount of TON to spend
 
     
    try {
@@ -16,6 +16,7 @@ export async function run(provider: NetworkProvider) {
             provider.sender(),
             {
                 value: TON_AMOUNT, // The amount of TON being spent
+                bounce: false,
             },
             {
                 $$type: 'BuyTokens', // Explicitly specify the message type

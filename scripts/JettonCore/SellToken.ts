@@ -3,7 +3,7 @@ import { NetworkProvider } from '@ton/blueprint';
 import { JettonCore } from '../../wrappers/jettonCore';
 
 export async function run(provider: NetworkProvider) {
-    const TOKEN_ADDRESS = 'EQDBJPeMuNRKUY2pE3WPR49ix59JPm2iiQAI7-jq67_RhuGz';
+    const TOKEN_ADDRESS = 'EQBWNd8tsYQa4QgQM2qj2YRsdc-h-_jp9KBRW6KBnYLLHo9P';
     const TOKENS_TO_SELL = 1_000_000_000n; // 1 token in nano-units
     
     try {

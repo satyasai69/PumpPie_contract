@@ -1,7 +1,7 @@
 import "@stdlib/deploy";
 import "./traits/JettonMaster.tact";
 import "./traits/JettonWallet.tact";
-import "../messages";
+import "../messages"; 
 
 message TransferOwnership {
     //  queryId: Int as uint64;  // Added standard queryId
@@ -190,7 +190,7 @@ get fun getTotalSupplyInCoins(): Int {
 
 
      
-   receive(msg: BuyTokens){
+ /*  receive(msg: BuyTokens){
         let amount: Int = context().value - context().readForwardFee(); // Subtract gas fees
         require(amount > 0, "Amount after fees must be greater than 0");
         
@@ -199,7 +199,7 @@ get fun getTotalSupplyInCoins(): Int {
         require(tokensToMint > 0, "Amount too small to mint tokens");
         require(tokensToMint <= 1000000000000, "Too many tokens per transaction");
         
-     /*   // Send TON to pool
+       // Send TON to pool
         send(SendParameters{
             to: self.pool,
             value: amount,
@@ -208,7 +208,7 @@ get fun getTotalSupplyInCoins(): Int {
                 amount: amount
             }.toCell(),
             mode: SendRemainingValue
-        }); */
+        }); 
 
         // Mint tokens to sender
         self._mint(context(), JettonMint{
@@ -221,9 +221,53 @@ get fun getTotalSupplyInCoins(): Int {
         });
 
         // The TON will stay in the contract since we're not sending it anywhere
-    }
+    } */
 
+ receive(msg: BuyTokens) {
+    // Validate pool address
+ 
+    require(self.pool.toString() != "", "Invalid pool address");
+    
+    // Reserve gas for processing
+    let minTonForStorage: Int = ton("0.1");
+    let minTonForPool: Int = ton("0.1");
+    let tonValue: Int = context().value;
+    require(tonValue >= minTonForStorage + minTonForPool, "Insufficient funds");
 
+    // Calculate amount available for token purchase
+    let amount: Int = tonValue - minTonForStorage - minTonForPool;
+    require(amount > 0, "Amount too small");
+    
+    let price: Int = self.getCurrentPrice();
+    let tokensToMint: Int = (amount * 1000000000) / price;
+    require(tokensToMint > 0, "Amount too small to mint tokens");
+    require(tokensToMint <= 1000000000000, "Too many tokens per transaction");
+    
+    // Send TON to pool with extra gas
+    send(SendParameters{
+        to: self.pool,
+        value: amount + minTonForPool,
+        body: PoolBuy{
+            jettonAddress: myAddress(),
+            amount: amount
+        }.toCell(),
+        mode: SendIgnoreErrors
+    }); 
+
+    // Validate sender address before minting
+    let senderAddress: Address = sender();
+    require(senderAddress.toString() != "", "Invalid sender address");
+
+    // Mint tokens to sender
+    self._mint(context(), JettonMint{
+        origin: senderAddress,
+        receiver: senderAddress,
+        amount: tokensToMint,
+        custom_payload: null,
+        forward_ton_amount: 0,
+        forward_payload: emptySlice()
+    });
+}
     
 
     receive(msg: SellTokens) {
@@ -233,17 +277,17 @@ get fun getTotalSupplyInCoins(): Int {
         let price: Int = self.getCurrentPrice();
         let tonAmount: Int = (msg.tokenAmount * price) / 1000000000;
         
-        // Send message to pool to transfer TON
+   /*     // Send message to pool to transfer TON
         send(SendParameters{
             to: self.pool,
             value: 0,
-            body: PoolSell{
+           body: PoolSell{
                 jettonAddress: myAddress(),
                 to: sender(),
                 amount: tonAmount
             }.toCell(),
             mode: SendRemainingValue
-        });
+        }); */
         
         // Burn the tokens
         self.total_supply = self.total_supply - msg.tokenAmount;
