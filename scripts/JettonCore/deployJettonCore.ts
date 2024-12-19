@@ -25,7 +25,7 @@ export async function run(provider: NetworkProvider) {
     let initial_Price: bigint = 10000n;
     let iinitial_mint_Amount: bigint = 10000000000000n;
 
-    const PoolCore_ADDRESS = "EQCoGWzQKWBQ3RTCvlybeH6TJfjkv03XLGBFVuRvGGGu0qYW";
+    const PoolCore_ADDRESS = "EQBaScBaDYJZ6PClixpIGNpl_ABp9MNVYiJzB_9N--N5li7v";
     const poolCoreAddress = Address.parse(PoolCore_ADDRESS);
   
 

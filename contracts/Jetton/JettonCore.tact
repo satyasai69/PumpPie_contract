@@ -28,6 +28,7 @@ contract JettonCore with JettonMaster, Deployable {
     jetton_content: Cell;
     mintable: Bool;
     max_supply: Int as coins;
+    initial_mint_amount: Int as coins;
     initial_token_price: Int as coins;
     curve_steepness: Int;
     base_amount: Int as coins;
@@ -38,7 +39,7 @@ contract JettonCore with JettonMaster, Deployable {
         require(token_price > 0, "Token price must be greater than 0");
         require(initial_mint >= 0 && initial_mint <= max_supply, "Invalid initial mint amount");
         
-        self.total_supply = 0;
+       self.total_supply = 0;
         self.owner = owner;
         self.mintable = true;
         self.jetton_content = content;
@@ -47,6 +48,7 @@ contract JettonCore with JettonMaster, Deployable {
         self.curve_steepness = 1;  // Default value, can be adjusted
         self.base_amount = 1000000000;  // 1 TON as base, can be adjusted
         self.pool = pool;
+        self.initial_mint_amount = initial_mint;
 
         // Mint initial tokens to owner if specified
         if (initial_mint > 0) {
@@ -58,8 +60,14 @@ contract JettonCore with JettonMaster, Deployable {
                 forward_ton_amount: 0,
                 forward_payload: emptySlice()
             });
-        }
-    }
+        } 
+    } 
+
+     
+    
+
+
+   
 
     override fun _mint_validate(ctx: Context, msg: JettonMint) {
         require(ctx.sender == self.owner, "Only owner can mint");
@@ -187,88 +195,37 @@ get fun getTotalSupplyInCoins(): Int {
     return total_supply_in_coins;
 }
 
+  receive(msg: BuyTokens) {
 
 
-     
- /*  receive(msg: BuyTokens){
-        let amount: Int = context().value - context().readForwardFee(); // Subtract gas fees
-        require(amount > 0, "Amount after fees must be greater than 0");
-        
-        let price: Int = self.getCurrentPrice();
-        let tokensToMint: Int = (amount * 1000000000) / price;
-        require(tokensToMint > 0, "Amount too small to mint tokens");
-        require(tokensToMint <= 1000000000000, "Too many tokens per transaction");
-        
-       // Send TON to pool
-        send(SendParameters{
-            to: self.pool,
-            value: amount,
-            body: PoolBuy{
-                jettonAddress: myAddress(),
-                amount: amount
-            }.toCell(),
-            mode: SendRemainingValue
-        }); 
-
-        // Mint tokens to sender
-        self._mint(context(), JettonMint{
-            origin: sender(),
-            receiver: sender(),
-            amount: tokensToMint,
-            custom_payload: null,
-            forward_ton_amount: 0, // Don't forward any TON
-            forward_payload: emptySlice()
-        });
-
-        // The TON will stay in the contract since we're not sending it anywhere
-    } */
-
- receive(msg: BuyTokens) {
-    // Validate pool address
- 
-    require(self.pool.toString() != "", "Invalid pool address");
+    // Verify sender is the pool
+   // require(sender() == self.pool, "Only pool can initiate buy");
+    // Set pool as owner temporarily for minting
+    self.owner = sender();
+    self.mintable = true;
     
-    // Reserve gas for processing
-    let minTonForStorage: Int = ton("0.1");
-    let minTonForPool: Int = ton("0.1");
-    let tonValue: Int = context().value;
-    require(tonValue >= minTonForStorage + minTonForPool, "Insufficient funds");
-
-    // Calculate amount available for token purchase
-    let amount: Int = tonValue - minTonForStorage - minTonForPool;
-    require(amount > 0, "Amount too small");
-    
+    // Calculate tokens to mint based on the bonding curve
     let price: Int = self.getCurrentPrice();
-    let tokensToMint: Int = (amount * 1000000000) / price;
-    require(tokensToMint > 0, "Amount too small to mint tokens");
-    require(tokensToMint <= 1000000000000, "Too many tokens per transaction");
+    require(price > 0, "Invalid token price");
     
-    // Send TON to pool with extra gas
-    send(SendParameters{
-        to: self.pool,
-        value: amount + minTonForPool,
-        body: PoolBuy{
-            jettonAddress: myAddress(),
-            amount: amount
-        }.toCell(),
-        mode: SendIgnoreErrors
-    }); 
-
-    // Validate sender address before minting
-    let senderAddress: Address = sender();
-    require(senderAddress.toString() != "", "Invalid sender address");
-
-    // Mint tokens to sender
+    // Calculate tokens to mint
+    let tokensToMint: Int = (msg.tonAmount * 1000000000) / price;
+    require(tokensToMint > 0, "Amount too small to mint tokens");
+    require(self.total_supply + tokensToMint <= self.max_supply, "Would exceed max supply");
+    
+    // Mint tokens to the buyer using JettonMint
     self._mint(context(), JettonMint{
-        origin: senderAddress,
-        receiver: senderAddress,
+        origin: myAddress(),
+        receiver: msg.resAddress,
         amount: tokensToMint,
         custom_payload: null,
         forward_ton_amount: 0,
         forward_payload: emptySlice()
     });
-}
     
+    // Update total supply
+    self.total_supply = self.total_supply + tokensToMint;
+  }
 
     receive(msg: SellTokens) {
         require(msg.tokenAmount > 0, "Amount must be greater than 0");

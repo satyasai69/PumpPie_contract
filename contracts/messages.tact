@@ -14,18 +14,18 @@ message JettonVerified {
 }
 
 message BuyTokens {
-   // tokenAddress: Address;
-    tokenAmount: Int;
+    resAddress: Address;
+    tonAmount: Int;
 }
 
 message SellTokens {
-   // tokenAddress: Address;
+    resAddress: Address;
     tokenAmount: Int;
 }
 
 message PoolBuy {
     jettonAddress: Address;
-    amount: Int as coins;
+   // amount: Int as coins;
 }
 
 message PoolSell {
@@ -36,4 +36,8 @@ message PoolSell {
 
 message AddJetton {
     jettonAddress: Address;
+}
+
+message BuyMint {
+    tokenAmount: Int;
 }
