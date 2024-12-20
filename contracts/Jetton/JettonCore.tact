@@ -286,5 +286,10 @@ contract JettonWalletImp with JettonWallet, Deployable {
         return initOf JettonWalletImp(owner_address, self.jetton_master);
     }
 
+      // this message handler will just debug print the seqno so we can see when it's called
+    receive("identify") {
+        dump("Identified JettonWalletImp");
+    }
+
     //Price = (Initial Price) * (1 + Purchase Amount / Liquidity Pool)^Curve Steepness
 }

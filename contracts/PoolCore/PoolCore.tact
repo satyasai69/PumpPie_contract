@@ -19,12 +19,20 @@ struct PendingSell {
     amount: Int;
 }
 
-
 message WalletDataMessage {
     balance: Int;
     owner: Address;
     jetton: Address;
     jetton_wallet_code: Cell;
+}
+
+message DeployJetton {
+    owner: Address;
+    content: Cell;
+    max_supply: Int;
+    token_price: Int;
+    initial_mint: Int;
+    pool: Address;
 }
 
 // Pool Contract to handle TON liquidity for multiple jettons
@@ -184,6 +192,52 @@ contract PoolCore with Deployable, Ownable {
         self.pendingSells.set(sell.sender, null);
     }
     
+    // Deploy a new Jetton contract
+    receive(msg: DeployJetton) {
+        // Verify sufficient gas for deployment
+        let gas: Int = ton("0.1");  // Fixed gas amount
+        let forward_gas: Int = ton("0.05"); // Amount to forward for Jetton operations
+        require(context().value > gas + forward_gas, "Insufficient value sent for deployment");
+
+        // Deploy new Jetton contract
+        let stateInit: StateInit = initOf JettonCore(
+            msg.owner,
+            msg.content,
+            msg.max_supply,
+            msg.token_price,
+            msg.initial_mint,
+            msg.pool
+        );
+
+        // Send deployment message
+        send(SendParameters{
+            to: contractAddress(stateInit),
+            value: forward_gas,
+            bounce: true,
+            mode: SendRemainingValue,
+            code: stateInit.code,
+            data: stateInit.data
+        });
+
+        // Add the new Jetton to the pool
+        let jettonAddress: Address = contractAddress(stateInit);
+        self.pools.set(jettonAddress, JettonPool{
+            balance: 0,
+            isActive: true
+        });
+    }
+
+    fun getJettonInit(owner: Address, content: Cell, max_supply: Int, token_price: Int, initial_mint: Int, pool: Address): StateInit {
+        return initOf JettonCore(
+            owner,      // owner
+            content,    // content
+            max_supply, // max_supply
+            token_price, // token_price
+            initial_mint, // initial_mint
+            pool        // pool address
+        );
+    }
+    
     // Get pool liquidity for a specific jetton
     get fun getJettonLiquidity(jettonAddress: Address): Int {
         let pool: JettonPool? = self.pools.get(jettonAddress);
@@ -195,6 +249,19 @@ contract PoolCore with Deployable, Ownable {
     get fun hasPool(jettonAddress: Address): Bool {
         let pool: JettonPool? = self.pools.get(jettonAddress);
         return (pool != null) && pool!!.isActive;
+    }
+    
+    // Get Jetton address for a given pool
+    get fun getJettonAddress(owner: Address): Address {
+        let init: StateInit = self.getJettonInit(
+            owner,      // owner
+            beginCell().endCell(), // empty content for address calculation
+            0,         // max_supply (not needed for address)
+            0,         // token_price (not needed for address)
+            0,         // initial_mint (not needed for address)
+            myAddress() // pool
+        );
+        return contractAddress(init);
     }
     
     // Remove jetton pool (only owner)
