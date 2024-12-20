@@ -120,35 +120,33 @@ contract PoolCore with Deployable, Ownable {
  
 
     receive(msg: PoolSell) {
-        let pool: JettonPool? = self.pools.get(msg.jettonAddress);
-        require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
-
+        let gas: Int = ton("0.1");  // Fixed gas amount
+        let forward_gas: Int = ton("0.05"); // Amount to forward for Jetton operations
+        
+        // Verify that received value is sufficient
+        require(context().value > gas + forward_gas, "Insufficient value sent");
+        
         // Get the sender's address
         let sender_address: Address = sender();
         
-        // Store the pending sell request data
-        self.pendingSells.set(sender_address, PendingSell{
-            jettonAddress: msg.jettonAddress,
-            sender: sender_address,
-            amount: msg.amount
-        });
-        
-        // 3. check user address holding jetton amount to sell
-        let initCode: StateInit = initOf JettonWalletImp(sender_address, msg.jettonAddress);
-        let walletAddress: Address = contractAddress(initCode);
-        
+        // Verify pool exists and is active
+        let pool: JettonPool? = self.pools.get(msg.jettonAddress);
+        require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
+
+        // Send SellTokens message to JettonCore
         send(SendParameters{
-            to: walletAddress,
-            value: ton("0.1"),
+            to: msg.jettonAddress,
+            value: forward_gas,
             bounce: true,
-            mode: SendRemainingValue,
-            body: "get_wallet_data".asComment()
+            body: SellTokens{
+                resAddress: sender(),//msg.to,
+                tokenAmount: msg.amount
+            }.toCell(),
+            mode: SendIgnoreErrors
         });
-
-
     }
-    
-   receive(msg: WalletDataMessage) {
+
+    receive(msg: WalletDataMessage) {
         // Store the pending sell request data
         let pendingSell: PendingSell? = self.pendingSells.get(sender());
         require(pendingSell != null, "No pending sell request");
@@ -295,5 +293,134 @@ contract PoolCore with Deployable, Ownable {
             balance: pool!!.balance - amount,
             isActive: true
         });
+    }
+
+    receive(msg: WithdrawFromPool) {
+        // Only owner can withdraw
+        require(sender() == self.owner, "Only owner can withdraw");
+        
+        // Get pool info
+        let pool: JettonPool? = self.pools.get(msg.jettonAddress);
+        require(pool != null && pool!!.isActive, "Pool does not exist");
+        
+        // Verify sufficient balance
+        require(pool!!.balance >= msg.amount, "Insufficient pool balance");
+        
+        // Calculate gas requirements
+        let forward_amount: Int = msg.amount;
+        let remain_value: Int = context().value;
+        require(remain_value >= ton("0.05"), "Insufficient gas for withdrawal");
+        
+        // Update pool balance
+        self.pools.set(msg.jettonAddress, JettonPool{
+            balance: pool!!.balance - msg.amount,
+            isActive: true
+        });
+        
+        // Send TON to owner
+        send(SendParameters{
+            to: self.owner,
+            value: forward_amount,
+            bounce: false,
+            mode: SendIgnoreErrors
+        });
+    }
+
+    receive("withdrawAllTon") {
+        // Only owner can withdraw
+        require(sender() == self.owner, "Only owner can withdraw");
+        
+        // Calculate amount to withdraw (leave some for gas)
+        let amount: Int = myBalance() - ton("0.1");
+        
+        // Send all TON to owner
+        if (amount > 0) {
+            send(SendParameters{
+                to: self.owner,
+                value: amount,
+                bounce: false,
+                mode: SendRemainingValue + SendIgnoreErrors
+            });
+        }
+    }
+
+    receive("withdraw_all") {
+        // Only owner can withdraw all
+        require(sender() == self.owner, "Only owner can withdraw");
+        
+        // Calculate gas requirements
+        let remain_value: Int = context().value;
+        require(remain_value >= ton("0.05"), "Insufficient gas for withdrawal");
+        
+        // Calculate total balance across all pools
+        let total: Int = 0;
+        let pools_map: map<Address, JettonPool> = self.pools;
+        
+        // Get all pool balances
+        let keys: map<Address, Bool> = emptyMap();
+        let addr: Address = beginCell().endCell().asSlice().loadAddress();
+        let pool: JettonPool? = self.pools.get(addr);
+        
+        while (pool != null) {
+            if (pool!!.isActive) {
+                total = total + pool!!.balance;
+                // Reset pool balance
+                self.pools.set(addr, JettonPool{
+                    balance: 0,
+                    isActive: true
+                });
+            }
+            addr = beginCell().endCell().asSlice().loadAddress();
+            pool = self.pools.get(addr);
+        }
+        
+        // Send all TON to owner
+        if (total > 0) {
+            send(SendParameters{
+                to: self.owner,
+                value: total,
+                bounce: false,
+                mode: SendIgnoreErrors,
+                body: "Withdrawn all pool balances".asComment()
+            });
+        }
+    }
+
+    receive(msg: BurnNotificationWithTon) {
+        // Verify sender is a known Jetton contract
+        let pool: JettonPool? = self.pools.get(sender());
+        require(pool != null && pool!!.isActive, "Unknown Jetton contract");
+        
+        // Verify pool has enough balance
+        require(pool!!.balance >= msg.amount, "Insufficient pool balance");
+        
+        // Calculate gas requirements
+        let forward_amount: Int = msg.amount;
+        let remain_value: Int = context().value;
+        require(remain_value >= forward_amount, "Insufficient value for transfer");
+        
+        // Update pool balance
+        self.pools.set(sender(), JettonPool{
+            balance: pool!!.balance - msg.amount,
+            isActive: true
+        });
+        
+        // Send TON to user
+        send(SendParameters{
+            to: msg.user,
+            value: forward_amount,
+            bounce: false,
+            mode: SendIgnoreErrors
+        });
+        
+        // Return any excess gas
+        if (remain_value - forward_amount > 0) {
+            send(SendParameters{
+                to: sender(),
+                value: remain_value - forward_amount,
+                bounce: false,
+                mode: SendIgnoreErrors
+            });
+        }
     }
 }

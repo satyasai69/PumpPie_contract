@@ -99,17 +99,48 @@ contract JettonCore with JettonMaster, Deployable {
     }
 
 
-    override  fun _burn_notification(ctx: Context, msg: JettonBurnNotification) {
+    override fun _burn_notification(ctx: Context, msg: JettonBurnNotification) {
+        // Validate burn notification
+        self._burn_notification_validate(ctx, msg);
+        
+        // Update total supply
         self.total_supply = self.total_supply - msg.amount;
-        if (msg.response_destination.toString() != "") {   //  if (msg.response_destination != null) {
+        
+        // Calculate TON amount to return based on current price
+        let price: Int = self.getCurrentPrice();
+        let tonAmount: Int = (msg.amount * price) / 1000000000;
+        
+        // Forward remaining gas to pool for TON transfer
+        let msgValue: Int = min(context().value, ton("0.1"));
+        
+        // Send notification to pool for TON transfer
+        send(SendParameters{
+            to: self.pool,
+            value: msgValue,
+            bounce: true,
+            mode: SendIgnoreErrors,
+            body: BurnNotificationWithTon{
+                amount: tonAmount,
+                tokenAmount: msg.amount,
+                user: msg.response_destination
+            }.toCell()
+        });
+
+        // Send any excess value back to user
+        if (context().value - msgValue > 0) {
             send(SendParameters{
-                    to: msg.response_destination,
-                    value: 0,
-                    bounce: false,
-                    mode: SendRemainingValue + SendIgnoreErrors
-                }
-            );
+                to: msg.response_destination,
+                value: context().value - msgValue,
+                bounce: false,
+                mode: SendIgnoreErrors
+            });
         }
+    }
+
+    override fun _burn_notification_validate(ctx: Context, msg: JettonBurnNotification) {
+        require(ctx.sender == self.pool, "Only pool can initiate burn");
+        require(msg.amount > 0, "Amount must be greater than 0");
+        require(self.total_supply >= msg.amount, "Insufficient tokens to burn");
     }
 
     override inline fun calculate_jetton_wallet_init(owner_address: Address): StateInit {
@@ -230,24 +261,26 @@ get fun getTotalSupplyInCoins(): Int {
     receive(msg: SellTokens) {
         require(msg.tokenAmount > 0, "Amount must be greater than 0");
         
-        // Calculate TON amount to return based on current price
-        let price: Int = self.getCurrentPrice();
-        let tonAmount: Int = (msg.tokenAmount * price) / 1000000000;
+        // Get the sender's wallet address
+        let senderWalletAddress: Address = self.get_wallet_address(msg.resAddress);
         
-   /*     // Send message to pool to transfer TON
+        // Create StateInit for the sender's wallet to verify
+        let initCode: StateInit = self.calculate_jetton_wallet_init(msg.resAddress);
+        require(contractAddress(initCode) == senderWalletAddress, "Invalid wallet address");
+
+        // Send message to wallet to burn tokens
         send(SendParameters{
-            to: self.pool,
+            to: senderWalletAddress,
             value: 0,
-           body: PoolSell{
-                jettonAddress: myAddress(),
-                to: sender(),
-                amount: tonAmount
-            }.toCell(),
-            mode: SendRemainingValue
-        }); */
-        
-        // Burn the tokens
-        self.total_supply = self.total_supply - msg.tokenAmount;
+            mode: SendRemainingValue,
+            bounce: true,
+            body: JettonBurn{
+                query_id: 0,
+                amount: msg.tokenAmount,
+                response_destination: msg.resAddress,
+                custom_payload: null
+            }.toCell()
+        });
     }
     receive("Mint:Close"){
         let ctx: Context = context();

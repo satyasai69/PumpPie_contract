@@ -41,3 +41,14 @@ message AddJetton {
 message BuyMint {
     tokenAmount: Int;
 }
+
+message BurnNotificationWithTon {
+    amount: Int as coins;
+    tokenAmount: Int as coins;
+    user: Address;
+}
+
+message WithdrawFromPool {
+    jettonAddress: Address;
+    amount: Int as coins;
+}

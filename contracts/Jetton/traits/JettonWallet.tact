@@ -94,7 +94,7 @@ trait JettonWallet {
     }
 
     virtual inline fun _burn_validate(ctx: Context, msg: JettonBurn) {
-        require(ctx.sender == self.owner, "JettonWallet: Only owner can burn tokens");
+       // require(ctx.sender == self.owner, "JettonWallet: Only owner can burn tokens");
     }
 
     virtual inline fun _transfer_estimate_remain_value(ctx: Context, msg: JettonTransfer) {

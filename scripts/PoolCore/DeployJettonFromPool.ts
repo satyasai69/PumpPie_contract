@@ -26,7 +26,7 @@ export async function run(provider: NetworkProvider) {
         await poolCore.send(
             provider.sender(),
             {
-                value: toNano('0.15'), // Increased gas value for deployment
+                value: toNano('0.3'), // Increased gas value for deployment
             },
             {
                 $$type: 'DeployJetton',
