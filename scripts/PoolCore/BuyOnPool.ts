@@ -4,8 +4,8 @@ import { JettonCore } from '../../wrappers/jettonCore';
 import { PoolCore } from '../../wrappers/PoolCore';
 
 export async function run(provider: NetworkProvider) {
-    const PoolCore_ADDRESS = "EQATkHBGHMeE_ilq3SX7e4Jz6GwspaDRh97AX0khWFUHRIVb";
-    const TOKEN_ADDRESS = 'EQAI18UHqCdMRiRerg1FbVeBFPr_S9U5POCjGgM3Oq9gZ1W3';
+    const PoolCore_ADDRESS = "EQCcPJDVADLxcRbs641KdW6stQg8b9jwCbkBktA2dREYExpD";
+    const TOKEN_ADDRESS = 'EQAlUDRK_ZrEjy2F250_1z7S_5sCHvo8_SRILSUGsYdWmsdO';
     const TOKEN_AMOUNT = toNano(0.5); // Amount of TON to spend
 
     

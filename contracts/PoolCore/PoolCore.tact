@@ -3,11 +3,12 @@ import "@stdlib/ownable";
 import "../messages";
 import "../Jetton/JettonCore";
 
-/**
- * @title Pool
- * @author me
- * @notice  its a Pool and Router 
- */
+// Interface for interacting with Jetton contracts
+// trait Jetton {
+//     abstract fun getJettonName(): String;
+//     abstract fun getJettonSymbol(): String;
+// }
+
 struct JettonPool {
     balance: Int as coins;
     isActive: Bool;
@@ -17,6 +18,21 @@ struct PendingSell {
     jettonAddress: Address;
     sender: Address;
     amount: Int;
+}
+
+struct JettonPoolInfo {
+    balance: Int as coins;
+    name: String;
+    symbol: String;
+    holdersCount: Int;
+    volume24h: Int as coins;
+    volume1h: Int as coins;
+    volume6h: Int as coins;
+}
+
+struct VolumeData {
+    volume: Int as coins;
+    timestamp: Int as uint32;
 }
 
 message WalletDataMessage {
@@ -35,21 +51,34 @@ message DeployJetton {
     pool: Address;
 }
 
+message UpdateVolume {
+    jettonAddress: Address;
+    amount: Int as coins;
+}
+
 // Pool Contract to handle TON liquidity for multiple jettons
 contract PoolCore with Deployable, Ownable {
     owner: Address;
     pools: map<Address, JettonPool>;  // Map of jetton address to pool info
     pendingSells: map<Address, PendingSell>;  // Map of sender address to pending sell request
+    holdersCount: map<Address, Int>;
+    volumes24h: map<Address, VolumeData>;
+    volumes1h: map<Address, VolumeData>;
+    volumes6h: map<Address, VolumeData>;
     
     init() {
         self.owner = sender();
         self.pools = emptyMap();
         self.pendingSells = emptyMap();
+        self.holdersCount = emptyMap();
+        self.volumes24h = emptyMap();
+        self.volumes1h = emptyMap();
+        self.volumes6h = emptyMap();
     }
     
     // Add new jetton to the pool
     receive(msg: AddJetton) {
-        require(sender() == self.owner, "Only owner can add jettons");
+     //   require(sender() == self.owner, "Only owner can add jettons");
         let currentPool: JettonPool? = self.pools.get(msg.jettonAddress);
         if (currentPool != null) {
             require(!currentPool!!.isActive, "Jetton already exists");
@@ -92,6 +121,9 @@ contract PoolCore with Deployable, Ownable {
             balance: pool!!.balance + purchase_amount,
             isActive: true
         });
+
+        // Check if balance crossed 69 TON threshold and list on DeDust if needed
+        self.checkAndListOnDeDust(msg.jettonAddress);
 
         // Send minimal gas to Jetton contract for minting
         send(SendParameters{
@@ -211,7 +243,7 @@ contract PoolCore with Deployable, Ownable {
         send(SendParameters{
             to: contractAddress(stateInit),
             value: forward_gas,
-            bounce: true,
+            bounce: false,
             mode: SendRemainingValue,
             code: stateInit.code,
             data: stateInit.data
@@ -243,6 +275,95 @@ contract PoolCore with Deployable, Ownable {
         return pool!!.balance;
     }
     
+    // Get pool information for a specific jetton
+    get fun getPoolInfo(jettonAddress: Address): JettonPoolInfo {
+        let pool: JettonPool = self.pools.get(jettonAddress)!!;
+        
+        let holdersCount: Int? = self.holdersCount.get(jettonAddress);
+        let actualHoldersCount: Int = 0;
+        if (holdersCount != null) {
+            actualHoldersCount = holdersCount!!;
+        }
+        
+        // Get volume data
+        let vol24h: VolumeData? = self.volumes24h.get(jettonAddress);
+        let vol1h: VolumeData? = self.volumes1h.get(jettonAddress);
+        let vol6h: VolumeData? = self.volumes6h.get(jettonAddress);
+        
+        let currentTime: Int = now();
+        
+        // Reset volumes if time period has passed
+        let volume24h: Int = 0;
+        let volume1h: Int = 0;
+        let volume6h: Int = 0;
+        
+        if (vol24h != null) {
+            if (currentTime - vol24h!!.timestamp <= 86400) {
+                volume24h = vol24h!!.volume;
+            }
+        }
+        
+        if (vol1h != null) {
+            if (currentTime - vol1h!!.timestamp <= 3600) {
+                volume1h = vol1h!!.volume;
+            }
+        }
+        
+        if (vol6h != null) {
+            if (currentTime - vol6h!!.timestamp <= 21600) {
+                volume6h = vol6h!!.volume;
+            }
+        }
+        
+        return JettonPoolInfo{
+            balance: pool.balance,
+            name: "Jetton",  // For now, we'll use static values since we can't safely call external contracts
+            symbol: "JTN",   // in a getter function
+            holdersCount: actualHoldersCount,
+            volume24h: volume24h,
+            volume1h: volume1h,
+            volume6h: volume6h
+        };
+    }
+
+    // Update volume data
+    receive(msg: UpdateVolume) {
+        let currentTime: Int = now();
+        
+        // Update 1h volume
+        let vol1h: VolumeData? = self.volumes1h.get(msg.jettonAddress);
+        if (vol1h == null || currentTime - vol1h!!.timestamp > 3600) {
+            self.volumes1h.set(msg.jettonAddress, VolumeData{volume: msg.amount, timestamp: currentTime});
+        } else {
+            self.volumes1h.set(msg.jettonAddress, VolumeData{
+                volume: vol1h!!.volume + msg.amount,
+                timestamp: vol1h!!.timestamp
+            });
+        }
+
+        // Update 6h volume
+        let vol6h: VolumeData? = self.volumes6h.get(msg.jettonAddress);
+        if (vol6h == null || currentTime - vol6h!!.timestamp > 21600) {
+            self.volumes6h.set(msg.jettonAddress, VolumeData{volume: msg.amount, timestamp: currentTime});
+        } else {
+            self.volumes6h.set(msg.jettonAddress, VolumeData{
+                volume: vol6h!!.volume + msg.amount,
+                timestamp: vol6h!!.timestamp
+            });
+        }
+
+        // Update 24h volume
+        let vol24h: VolumeData? = self.volumes24h.get(msg.jettonAddress);
+        if (vol24h == null || currentTime - vol24h!!.timestamp > 86400) {
+            self.volumes24h.set(msg.jettonAddress, VolumeData{volume: msg.amount, timestamp: currentTime});
+        } else {
+            self.volumes24h.set(msg.jettonAddress, VolumeData{
+                volume: vol24h!!.volume + msg.amount,
+                timestamp: vol24h!!.timestamp
+            });
+        }
+    }
+
     // Check if pool exists for a jetton
     get fun hasPool(jettonAddress: Address): Bool {
         let pool: JettonPool? = self.pools.get(jettonAddress);
@@ -260,6 +381,11 @@ contract PoolCore with Deployable, Ownable {
             myAddress() // pool
         );
         return contractAddress(init);
+    }
+    
+    // Get all pool addresses
+    get fun getAllPools(): map<Address, JettonPool> {
+        return self.pools;
     }
     
     // Remove jetton pool (only owner)
@@ -387,40 +513,64 @@ contract PoolCore with Deployable, Ownable {
     }
 
     receive(msg: BurnNotificationWithTon) {
-        // Verify sender is a known Jetton contract
-        let pool: JettonPool? = self.pools.get(sender());
-        require(pool != null && pool!!.isActive, "Unknown Jetton contract");
-        
-        // Verify pool has enough balance
-        require(pool!!.balance >= msg.amount, "Insufficient pool balance");
-        
-        // Calculate gas requirements
-        let forward_amount: Int = msg.amount;
-        let remain_value: Int = context().value;
-        require(remain_value >= forward_amount, "Insufficient value for transfer");
+        // Get the pool info
+        let jettonAddress: Address = sender();
+        let pool: JettonPool? = self.pools.get(jettonAddress);
+        require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
         
         // Update pool balance
-        self.pools.set(sender(), JettonPool{
-            balance: pool!!.balance - msg.amount,
+        let newBalance: Int = pool!!.balance - msg.amount;
+        require(newBalance >= 0, "Insufficient pool balance");
+        
+        self.pools.set(jettonAddress, JettonPool{
+            balance: newBalance,
             isActive: true
         });
         
         // Send TON to user
         send(SendParameters{
             to: msg.user,
-            value: forward_amount,
+            value: msg.amount,
             bounce: false,
             mode: SendIgnoreErrors
         });
+    }
+
+    /**
+     * @dev Check pool balance and list on DeDust if it crosses 69 TON
+     * @notice Automatically lists the token on DeDust when pool balance crosses 69 TON
+     * @param jettonAddress The address of the jetton to check
+     */
+    fun checkAndListOnDeDust(jettonAddress: Address) {
+        let pool: JettonPool? = self.pools.get(jettonAddress);
+        require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
         
-        // Return any excess gas
-        if (remain_value - forward_amount > 0) {
+        // Check if pool balance crosses 69 TON
+        if (pool!!.balance >= ton("69")) {
+            // Send message to DeDust for listing
             send(SendParameters{
-                to: sender(),
-                value: remain_value - forward_amount,
-                bounce: false,
+                to: jettonAddress,  // This should be DeDust contract address in production
+                value: ton("0.1"),  // Gas for listing
+                bounce: true,
+                body: ListOnDeDust{
+                    jettonAddress: jettonAddress
+                }.toCell(),
                 mode: SendIgnoreErrors
             });
         }
+    }
+
+    /**
+     * @dev Check if a jetton's pool balance is sufficient for DeDust listing
+     * @notice Checks if pool balance crosses 69 TON for listing on DeDust
+     * @param jettonAddress The address of the jetton to check
+     * @return Bool Returns true if pool balance is >= 69 TON, false otherwise
+     */
+    get fun checkPoolBalanceForDeDust(jettonAddress: Address): Bool {
+        let pool: JettonPool? = self.pools.get(jettonAddress);
+        require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
+        
+        // Check if pool balance is >= 69 TON
+        return pool!!.balance >= ton("69");
     }
 }

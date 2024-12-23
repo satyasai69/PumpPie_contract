@@ -130,10 +130,13 @@ trait JettonWallet {
     }
 
     virtual inline fun _burn_tokens(ctx: Context, msg: JettonBurn) {
+        // Reserve some gas for processing
+        let msgValue: Int = ctx.value - self.gasConsumption;
+        
         send(SendParameters{
                 to: self.jetton_master,
-                value: 0,
-                mode: SendRemainingValue,
+                value: msgValue,
+                mode: SendPayGasSeparately,  // Pay gas separately to ensure proper delivery
                 bounce: true,
                 body: JettonBurnNotification{
                     query_id: msg.query_id,
@@ -184,14 +187,15 @@ trait JettonWallet {
 
     virtual inline fun _internal_transfer_excesses(ctx: Context, msg: JettonInternalTransfer, remain: Int) {
         if (msg.response_address != null && remain > 0) {
-            send(SendParameters{
+            //TODO refund gas
+         /*   send(SendParameters{
                     to: msg.response_address!!,
                     value: remain,
                     bounce: false,
                     mode: SendIgnoreErrors,
                     body: JettonExcesses{query_id: msg.query_id}.toCell()
                 }
-            );
+            ); */
         }
     }
 

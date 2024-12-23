@@ -74,9 +74,9 @@ trait JettonMaster {
         if (msg.response_destination.toString() != "") {   //  if (msg.response_destination != null) {
             send(SendParameters{
                     to: msg.response_destination,
-                    value: 0,
+                    value: ctx.value,  // Forward the remaining value
                     bounce: false,
-                    mode: SendRemainingValue + SendIgnoreErrors
+                    mode: SendPayGasSeparately  // Pay gas separately for reliable delivery
                 }
             );
         }

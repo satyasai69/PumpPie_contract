@@ -4,7 +4,7 @@ import { PoolCore } from '../../wrappers/PoolCore';
 import { buildOnchainMetadata } from '../../utils/jetton-helpers';
 
 export async function run(provider: NetworkProvider) {
-    const PoolCore_ADDRESS = "kQBdg-8VF46WLikFviLfEMxKcrlfiCxgPg6JUYL6U-rFCsq7";
+    const PoolCore_ADDRESS = "EQATG0zcV9NgnPtxq1xjHEKgDzyvuyQavbGTpMU7ScPIpGde";
     
     try {
         // Initialize PoolCore contract instance
@@ -27,6 +27,7 @@ export async function run(provider: NetworkProvider) {
             provider.sender(),
             {
                 value: toNano('0.3'), // Increased gas value for deployment
+                bounce: true
             },
             {
                 $$type: 'DeployJetton',

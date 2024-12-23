@@ -52,3 +52,7 @@ message WithdrawFromPool {
     jettonAddress: Address;
     amount: Int as coins;
 }
+
+message ListOnDeDust {
+    jettonAddress: Address;
+}

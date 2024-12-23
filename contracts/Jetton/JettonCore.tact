@@ -138,7 +138,9 @@ contract JettonCore with JettonMaster, Deployable {
     }
 
     override fun _burn_notification_validate(ctx: Context, msg: JettonBurnNotification) {
-        require(ctx.sender == self.pool, "Only pool can initiate burn");
+        let initCode: StateInit = self.calculate_jetton_wallet_init(msg.sender);
+        let isValidWallet: Bool = ctx.sender == contractAddress(initCode);
+        require(ctx.sender == self.pool || isValidWallet, "Invalid sender: must be pool or valid wallet");
         require(msg.amount > 0, "Amount must be greater than 0");
         require(self.total_supply >= msg.amount, "Insufficient tokens to burn");
     }
@@ -155,6 +157,12 @@ contract JettonCore with JettonMaster, Deployable {
         require(self.total_supply + purchase_amount <= self.max_supply, "Purchase would exceed max supply");
         
         let supply_ratio: Int = (purchase_amount * 1000000000) / self.base_amount;  // Multiply by 10^9 for precision
+        
+        // Return total price (initial_price * amount) if supply ratio is zero
+        if (supply_ratio == 0) {
+            return self.initial_token_price * purchase_amount;
+        }
+        
         let base_multiplier: Int = 1000000000 + supply_ratio;  // (1 + Purchase Amount / Base)
         
         // Calculate power: base_multiplier^curve_steepness
@@ -178,6 +186,12 @@ contract JettonCore with JettonMaster, Deployable {
     // Calculate current token price based on bonding curve
     get fun getCurrentPrice(): Int {
         let supply_ratio: Int = (self.total_supply * 1000000000) / self.base_amount;  // Multiply by 10^9 for precision
+        
+        // Return initial price if supply ratio is zero
+        if (supply_ratio == 0) {
+            return self.initial_token_price;
+        }
+        
         let base_multiplier: Int = 1000000000 + supply_ratio;  // (1 + Purchase Amount / Base)
         
         // Calculate power: base_multiplier^curve_steepness
@@ -205,15 +219,7 @@ contract JettonCore with JettonMaster, Deployable {
 
     // Check for reasonable curve steepness
     if (self.curve_steepness <= 0 || self.curve_steepness > 100) {
-        throw(101);
-    }
-
-    // Perform the power calculation safely
-    repeat(self.curve_steepness) {
-        result = (result * base_multiplier) / 1000000000;
-        if (result <= 0) {
-            throw(101);
-        }
+        throw(102);
     }
 
     return result;
@@ -255,7 +261,7 @@ get fun getTotalSupplyInCoins(): Int {
     });
     
     // Update total supply
-    self.total_supply = self.total_supply + tokensToMint;
+    // self.total_supply = self.total_supply + tokensToMint;
   }
 
     receive(msg: SellTokens) {
