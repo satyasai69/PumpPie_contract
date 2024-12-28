@@ -4,8 +4,8 @@ import { PoolCore } from '../../wrappers/PoolCore';
 
 export async function run(provider: NetworkProvider) {
     // Configuration
-    const PoolCore_ADDRESS = "EQCcPJDVADLxcRbs641KdW6stQg8b9jwCbkBktA2dREYExpD";
-    const JETTON_ADDRESS = "EQAlUDRK_ZrEjy2F250_1z7S_5sCHvo8_SRILSUGsYdWmsdO"; // Replace with your Jetton address
+    const PoolCore_ADDRESS = "EQCoKI56zm4lI1J_PQ7Pu2bRfuwt2Beq1lzDfBIugg0WEKPt";
+    const JETTON_ADDRESS = "EQCqRWCQRhOsAaHuq8T4NaAJHLebOHcFUBQ-2aF1i409ARJk"; // Replace with your Jetton address
 
     try {
         console.log('Starting pool deployment...');

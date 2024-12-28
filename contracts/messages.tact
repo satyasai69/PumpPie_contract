@@ -18,6 +18,10 @@ message BuyTokens {
     tonAmount: Int;
 }
 
+message BuyInCore {
+    queryId: Int as uint64;
+}
+
 message SellTokens {
     resAddress: Address;
     tokenAmount: Int;
@@ -55,4 +59,8 @@ message WithdrawFromPool {
 
 message ListOnDeDust {
     jettonAddress: Address;
+}
+
+message SellInCore {
+    jettonAmount: Int as coins;
 }

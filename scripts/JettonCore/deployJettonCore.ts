@@ -1,4 +1,3 @@
-
 import { Address, toNano, beginCell } from '@ton/core';
 import { JettonCore } from '../../wrappers/jettonCore';
 import { NetworkProvider } from '@ton/blueprint';
@@ -25,7 +24,7 @@ export async function run(provider: NetworkProvider) {
     let initial_Price: bigint = 10000n;
     let iinitial_mint_Amount: bigint = 10000000000000n;
 
-    const PoolCore_ADDRESS = "EQCZ5BCtbFd52Q4gZPuTf40HN9HR5HzAnnFNgQBdvFiQUAsk";
+    const PoolCore_ADDRESS = "EQCoKI56zm4lI1J_PQ7Pu2bRfuwt2Beq1lzDfBIugg0WEKPt";
     const poolCoreAddress = Address.parse(PoolCore_ADDRESS);
   
 
@@ -41,7 +40,7 @@ export async function run(provider: NetworkProvider) {
    await sampleJetton.send(
         provider.sender(),
         {
-            value: toNano('0.05'),
+            value: toNano('0.1'), // Increased to 0.5 TON to ensure enough gas for all operations
         },
         {
             $$type: 'Deploy',

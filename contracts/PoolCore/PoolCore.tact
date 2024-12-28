@@ -56,6 +56,11 @@ message UpdateVolume {
     amount: Int as coins;
 }
 
+/* message AddJettonEvent {
+    jettonAddress: Address;
+    by: Address;
+} */
+
 // Pool Contract to handle TON liquidity for multiple jettons
 contract PoolCore with Deployable, Ownable {
     owner: Address;
@@ -89,6 +94,11 @@ contract PoolCore with Deployable, Ownable {
             balance: 0,
             isActive: true
         });
+
+     /*   emit(AddJettonEvent{
+            jettonAddress: msg.jettonAddress,
+            by: sender()
+        }); */
     }
 
      /**
@@ -111,7 +121,7 @@ contract PoolCore with Deployable, Ownable {
         require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
 
         // Verify that received value is sufficient
-        require(context().value > gas + forward_gas, "Insufficient value sent");
+        require(context().value > gas + forward_gas, "Insufficient value sent increase gas ");
         
         let sender_address: Address = sender();
         let purchase_amount: Int = context().value - gas - forward_gas;
@@ -513,25 +523,21 @@ contract PoolCore with Deployable, Ownable {
     }
 
     receive(msg: BurnNotificationWithTon) {
-        // Get the pool info
+        // Get the pool for this jetton
         let jettonAddress: Address = sender();
         let pool: JettonPool? = self.pools.get(jettonAddress);
         require(pool != null && pool!!.isActive, "Pool for this jetton does not exist");
         
-        // Update pool balance
-        let newBalance: Int = pool!!.balance - msg.amount;
-        require(newBalance >= 0, "Insufficient pool balance");
-        
+        // Update pool balance after burn
         self.pools.set(jettonAddress, JettonPool{
-            balance: newBalance,
+            balance: pool!!.balance - msg.amount,
             isActive: true
         });
-        
-        // Send TON to user
+
+        // Send TON to the user
         send(SendParameters{
             to: msg.user,
             value: msg.amount,
-            bounce: false,
             mode: SendIgnoreErrors
         });
     }
@@ -573,4 +579,9 @@ contract PoolCore with Deployable, Ownable {
         // Check if pool balance is >= 69 TON
         return pool!!.balance >= ton("69");
     }
+
+
+
+
+
 }

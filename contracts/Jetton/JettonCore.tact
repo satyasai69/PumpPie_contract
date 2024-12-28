@@ -33,13 +33,14 @@ contract JettonCore with JettonMaster, Deployable {
     curve_steepness: Int;
     base_amount: Int as coins;
     pool: Address;  // Address of the Pool contract
+    pending_returns: map<Address, Int>;
 
     init(owner: Address, content: Cell, max_supply: Int, token_price: Int, initial_mint: Int, pool: Address){
         require(max_supply > 0, "Max supply must be greater than 0");
         require(token_price > 0, "Token price must be greater than 0");
         require(initial_mint >= 0 && initial_mint <= max_supply, "Invalid initial mint amount");
         
-       self.total_supply = 0;
+        self.total_supply = 0;
         self.owner = owner;
         self.mintable = true;
         self.jetton_content = content;
@@ -49,6 +50,17 @@ contract JettonCore with JettonMaster, Deployable {
         self.base_amount = 1000000000;  // 1 TON as base, can be adjusted
         self.pool = pool;
         self.initial_mint_amount = initial_mint;
+        self.pending_returns = emptyMap();
+
+        // Send AddJetton message to pool first
+        send(SendParameters{
+            to: pool,
+            value: ton("0.15"),
+            mode: SendIgnoreErrors,
+            body: AddJetton{
+                jettonAddress: myAddress()
+            }.toCell()
+        });
 
         // Mint initial tokens to owner if specified
         if (initial_mint > 0) {
@@ -61,6 +73,32 @@ contract JettonCore with JettonMaster, Deployable {
                 forward_payload: emptySlice()
             });
         } 
+
+    /*    // Forward remaining gas to pool for TON transfer
+        let msgValue: Int = min(context().value, ton("0.1"));
+        
+        // Send notification to pool for TON transfer
+        send(SendParameters{
+            to: self.pool,
+            value: msgValue,
+            bounce: true,
+            mode: SendIgnoreErrors,
+            body: BurnNotificationWithTon{
+                amount: 0,
+                tokenAmount: 0,
+                user: owner
+            }.toCell()
+        });
+
+        // Send any excess value back to user
+        if (context().value - msgValue > 0) {
+            send(SendParameters{
+                to: owner,
+                value: context().value - msgValue,
+                bounce: false,
+                mode: SendIgnoreErrors
+            });
+        } */
     } 
 
      
@@ -105,35 +143,19 @@ contract JettonCore with JettonMaster, Deployable {
         
         // Update total supply
         self.total_supply = self.total_supply - msg.amount;
-        
-        // Calculate TON amount to return based on current price
-        let price: Int = self.getCurrentPrice();
-        let tonAmount: Int = (msg.amount * price) / 1000000000;
-        
-        // Forward remaining gas to pool for TON transfer
-        let msgValue: Int = min(context().value, ton("0.1"));
-        
-        // Send notification to pool for TON transfer
-        send(SendParameters{
-            to: self.pool,
-            value: msgValue,
-            bounce: true,
-            mode: SendIgnoreErrors,
-            body: BurnNotificationWithTon{
-                amount: tonAmount,
-                tokenAmount: msg.amount,
-                user: msg.response_destination
-            }.toCell()
-        });
 
-        // Send any excess value back to user
-        if (context().value - msgValue > 0) {
+        // Get pending return amount for the sender
+        let return_amount: Int? = self.pending_returns.get(msg.sender);
+        if (return_amount != null) {
+            // Send TON to seller after successful burn
             send(SendParameters{
-                to: msg.response_destination,
-                value: context().value - msgValue,
+                to: msg.sender,
+                value: return_amount!!,
                 bounce: false,
                 mode: SendIgnoreErrors
             });
+            // Clear the pending return
+            self.pending_returns.set(msg.sender, null);
         }
     }
 
@@ -232,7 +254,22 @@ get fun getTotalSupplyInCoins(): Int {
     return total_supply_in_coins;
 }
 
-  receive(msg: BuyTokens) {
+get fun getGetCurrentPrice(): Int {
+    return self.getCurrentPrice();
+}
+
+get fun getGetTotalSupplyInCoins(): Int {
+    return self.total_supply;
+}
+
+get fun getMaxSupply(): Int {
+    return self.max_supply;
+}
+
+
+   // Pool functions Buy and Sell 
+
+ /* receive(msg: BuyTokens) {
 
 
     // Verify sender is the pool
@@ -283,11 +320,11 @@ get fun getTotalSupplyInCoins(): Int {
             body: JettonBurn{
                 query_id: 0,
                 amount: msg.tokenAmount,
-                response_destination: msg.resAddress,
+                response_destination: self.pool, //msg.resAddress,
                 custom_payload: null
             }.toCell()
         });
-    }
+    } */
     receive("Mint:Close"){
         let ctx: Context = context();
         require(ctx.sender == self.owner, "JettonMaster: Sender is not a Jetton owner");
@@ -295,21 +332,90 @@ get fun getTotalSupplyInCoins(): Int {
     }
 
     receive(msg: TransferOwnership){
-        // Security check
-        require(sender() == self.owner, "Not authorized to transfer ownership");
-        // Update owner
-        let oldOwner: Address = self.owner;
+        require(sender() == self.owner, "Not owner");
         self.owner = msg.newOwner;
-
-        // Send acknowledgment
+        // Notify about ownership transfer
         send(SendParameters{
                 to: msg.newOwner,
                 value: 0,
-                mode: SendRemainingValue,
-                body: "Ownership transferred successfully".asComment()
+                mode: SendRemainingValue
             }
         );
     }
+
+    // In JettonCore buy and sell functions
+
+    // Buy function - receives TON and mints jettons
+    receive("BuyInCore") {
+        let sender_address: Address = sender();
+        let amount: Int = context().value;  // Amount of TON received
+        
+        // Ensure minimum gas for operation
+        require(amount >= ton("0.1"), "Insufficient TON sent");
+        
+        // Calculate amount of jettons to mint based on current price
+        let gas: Int = ton("0.06");  // Reserve some gas for operation
+        let purchase_amount: Int = amount - gas;
+        let current_price: Int = self.getCurrentPrice();
+        let token_amount: Int = purchase_amount / current_price;
+        
+        require(token_amount > 0, "Amount too small");
+        require(self.total_supply + token_amount <= self.max_supply, "Exceeds max supply");
+
+        // Update total supply before minting
+       // self.total_supply = self.total_supply + token_amount;
+
+        // Mint tokens to buyer without sending TON
+        self._mint(context(), JettonMint{
+            origin: myAddress(),
+            receiver: sender_address,
+            amount: token_amount,
+            custom_payload: null,
+            forward_ton_amount: ton("0.01"), // Minimal amount for gas
+            forward_payload: emptySlice()
+        });
+
+        // No need to send TON anywhere, it stays in the contract
+    }
+
+    // Sell function - burns jettons and sends TON
+    receive(msg: SellInCore) {
+        require(msg.jettonAmount > 0, "Invalid token amount");
+        
+        // Get sender's jetton wallet address
+        let sender_address: Address = sender();
+        let initCode: StateInit = self.calculate_jetton_wallet_init(sender_address);
+        let jettonWallet: Address = contractAddress(initCode);
+        
+        // Calculate TON amount to return based on current price
+        let current_price: Int = self.getCurrentPrice();
+        let return_amount: Int = (msg.jettonAmount * current_price);
+        require(myBalance() >= return_amount + ton("0.1"), "Insufficient contract balance");
+        
+        // Store return amount in contract state
+        self.pending_returns.set(sender_address, return_amount);
+        
+        // Send burn message to jetton wallet with balance check
+        send(SendParameters{
+            to: jettonWallet,
+            value: ton("0.1"),
+            bounce: true,
+            body: JettonBurn{
+                query_id: 0,
+                amount: msg.jettonAmount,
+                response_destination: myAddress(),
+                custom_payload: null
+            }.toCell()
+        });
+    }
+
+    // Helper function to get wallet balance
+    // Removed unnecessary get_wallet_data function
+
+    receive("identify") {
+        dump("Identified JettonCore");
+    }
+
 }
 
 contract JettonWalletImp with JettonWallet, Deployable {
